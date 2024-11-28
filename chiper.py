@@ -1,154 +1,122 @@
 import numpy as np
 
+# -------------------- MONOALPHABETIC CIPHER --------------------
+def monoalphabetic_encrypt(text, key):
+    encrypted = ''.join(key[ord(c) - ord('A')] if c.isalpha() else c for c in text.upper())
+    return encrypted
 
-# Monoalphabetic Cipher
-def monoalphabetic_encrypt(plaintext, key):
-    alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-    substitution = key.upper()
-    table = str.maketrans(alphabet, substitution)
-    return plaintext.upper().translate(table)
+def monoalphabetic_decrypt(text, key):
+    inverse_key = {v: k for k, v in enumerate(key)}
+    decrypted = ''.join(chr(inverse_key[c] + ord('A')) if c.isalpha() else c for c in text.upper())
+    return decrypted
 
+# -------------------- VIGENÈRE CIPHER --------------------
+def vigenere_encrypt(text, key):
+    text, key = text.upper(), key.upper()
+    encrypted = ''.join(chr((ord(t) + ord(k) - 2 * ord('A')) % 26 + ord('A'))
+                        if t.isalpha() else t
+                        for t, k in zip(text, (key * (len(text) // len(key) + 1))[:len(text)]))
+    return encrypted
 
-def monoalphabetic_decrypt(ciphertext, key):
-    alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-    substitution = key.upper()
-    table = str.maketrans(substitution, alphabet)
-    return ciphertext.upper().translate(table)
+def vigenere_decrypt(text, key):
+    text, key = text.upper(), key.upper()
+    decrypted = ''.join(chr((ord(t) - ord(k) + 26) % 26 + ord('A'))
+                        if t.isalpha() else t
+                        for t, k in zip(text, (key * (len(text) // len(key) + 1))[:len(text)]))
+    return decrypted
 
+# -------------------- PLAYFAIR CIPHER --------------------
+def preprocess_text(text):
+    text = ''.join(filter(str.isalpha, text)).upper()
+    if len(text) % 2 != 0:
+        text += 'X'  # Padding
+    return text
 
-# Polyalphabetic Cipher (Vigenere)
-def vigenere_encrypt(plaintext, key):
-    alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-    plaintext = plaintext.upper()
-    key = key.upper()
-    key = (key * (len(plaintext) // len(key) + 1))[:len(plaintext)]
-    ciphertext = ""
-    for p, k in zip(plaintext, key):
-        if p in alphabet:
-            ciphertext += alphabet[(alphabet.index(p) + alphabet.index(k)) % 26]
-        else:
-            ciphertext += p
-    return ciphertext
+def create_key_table(key):
+    key = ''.join(sorted(set(key.upper()), key=key.index)) + 'ABCDEFGHIKLMNOPQRSTUVWXYZ'
+    key = ''.join(sorted(set(key), key=key.index))
+    return [key[i:i+5] for i in range(0, 25, 5)]
 
+def find_position(char, key_table):
+    for i, row in enumerate(key_table):
+        for j, c in enumerate(row):
+            if char == c:
+                return i, j
+    return None
 
-def vigenere_decrypt(ciphertext, key):
-    alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-    ciphertext = ciphertext.upper()
-    key = key.upper()
-    key = (key * (len(ciphertext) // len(key) + 1))[:len(ciphertext)]
-    plaintext = ""
-    for c, k in zip(ciphertext, key):
-        if c in alphabet:
-            plaintext += alphabet[(alphabet.index(c) - alphabet.index(k)) % 26]
-        else:
-            plaintext += c
-    return plaintext
-
-
-# Playfair Cipher
-def playfair_encrypt(plaintext, key):
-    def format_key(key):
-        alphabet = "ABCDEFGHIKLMNOPQRSTUVWXYZ"  # J is merged with I
-        key = "".join(sorted(set(key.upper()), key=lambda x: key.index(x)))
-        return "".join([c for c in key + alphabet if c not in key or key.count(c) == 1])
-
-    def format_text(text):
-        text = text.upper().replace("J", "I").replace(" ", "")
-        result = []
-        i = 0
-        while i < len(text):
-            if i + 1 < len(text) and text[i] == text[i + 1]:
-                result.append(text[i] + "X")
-                i += 1
-            else:
-                result.append(text[i:i + 2])
-                i += 2
-        if len(result[-1]) == 1:
-            result[-1] += "X"
-        return result
-
-    def find_position(char, table):
-        for row, line in enumerate(table):
-            for col, letter in enumerate(line):
-                if char == letter:
-                    return row, col
-
-    key_table = [list(format_key(key)[i:i + 5]) for i in range(0, 25, 5)]
-    pairs = format_text(plaintext)
-    ciphertext = ""
+def playfair_encrypt(text, key):
+    text = preprocess_text(text)
+    key_table = create_key_table(key)
+    pairs = [text[i:i+2] for i in range(0, len(text), 2)]
+    encrypted = ""
     for pair in pairs:
         row1, col1 = find_position(pair[0], key_table)
         row2, col2 = find_position(pair[1], key_table)
-        if row1 == row2:
-            ciphertext += key_table[row1][(col1 + 1) % 5] + key_table[row2][(col2 + 1) % 5]
-        elif col1 == col2:
-            ciphertext += key_table[(row1 + 1) % 5][col1] + key_table[(row2 + 1) % 5][col2]
-        else:
-            ciphertext += key_table[row1][col2] + key_table[row2][col1]
-    return ciphertext
+        if row1 == row2:  # Same row
+            encrypted += key_table[row1][(col1 + 1) % 5]
+            encrypted += key_table[row2][(col2 + 1) % 5]
+        elif col1 == col2:  # Same column
+            encrypted += key_table[(row1 + 1) % 5][col1]
+            encrypted += key_table[(row2 + 1) % 5][col2]
+        else:  # Rectangle rule
+            encrypted += key_table[row1][col2]
+            encrypted += key_table[row2][col1]
+    return encrypted
 
-
-# Hill Cipher
-def hill_encrypt(plaintext, key_matrix):
-    alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-    plaintext = plaintext.upper().replace(" ", "")
+# -------------------- HILL CIPHER --------------------
+def hill_encrypt(text, key_matrix):
+    text = preprocess_text(text)
     n = key_matrix.shape[0]
-    if len(plaintext) % n != 0:
-        plaintext += "X" * (n - len(plaintext) % n)
-    chunks = [plaintext[i:i + n] for i in range(0, len(plaintext), n)]
-    ciphertext = ""
-    for chunk in chunks:
-        chunk_vector = [alphabet.index(c) for c in chunk]
-        result_vector = np.dot(key_matrix, chunk_vector) % 26
-        ciphertext += "".join(alphabet[int(v)] for v in result_vector)
-    return ciphertext
+    while len(text) % n != 0:
+        text += 'X'
+    text_vector = np.array([ord(c) - ord('A') for c in text]).reshape(-1, n).T
+    encrypted_vector = (np.dot(key_matrix, text_vector) % 26).T.flatten()
+    encrypted = ''.join(chr(c + ord('A')) for c in encrypted_vector)
+    return encrypted
 
-
-# Transposition Cipher
-def single_transposition_encrypt(plaintext, key):
-    key_order = sorted(list(key))
-    columns = len(key)
-    grid = [plaintext[i:i + columns] for i in range(0, len(plaintext), columns)]
-    grid[-1] += "X" * (columns - len(grid[-1]))
-    ciphertext = ""
-    for column in key_order:
-        index = key.index(column)
-        ciphertext += "".join(row[index] for row in grid)
-    return ciphertext
-
-
-def double_transposition_encrypt(plaintext, key1, key2):
-    first_pass = single_transposition_encrypt(plaintext, key1)
-    second_pass = single_transposition_encrypt(first_pass, key2)
-    return second_pass
-
-
-# Example Usage
+# -------------------- MAIN --------------------
 if __name__ == "__main__":
-    # Monoalphabetic Cipher Example
-    mono_key = "QWERTYUIOPASDFGHJKLZXCVBNM"
-    mono_encrypted = monoalphabetic_encrypt("HELLO WORLD", mono_key)
-    mono_decrypted = monoalphabetic_decrypt(mono_encrypted, mono_key)
-    print("Monoalphabetic Encrypted:", mono_encrypted)
-    print("Monoalphabetic Decrypted:", mono_decrypted)
+    print("Cipher Program - Choose a Cipher to Encrypt Text\n")
+    print("1. Monoalphabetic Cipher")
+    print("2. Vigenère Cipher")
+    print("3. Playfair Cipher")
+    print("4. Hill Cipher\n")
 
-    # Polyalphabetic Cipher Example
-    vigenere_encrypted = vigenere_encrypt("HELLO WORLD", "KEY")
-    vigenere_decrypted = vigenere_decrypt(vigenere_encrypted, "KEY")
-    print("Vigenere Encrypted:", vigenere_encrypted)
-    print("Vigenere Decrypted:", vigenere_decrypted)
+    choice = input("Enter the number corresponding to your choice: ").strip()
 
-    # Playfair Cipher Example
-    playfair_encrypted = playfair_encrypt("HELLO WORLD", "KEYWORD")
-    print("Playfair Encrypted:", playfair_encrypted)
+    if choice not in {'1', '2', '3', '4'}:
+        print("Invalid choice. Please restart the program and try again.")
+        exit()
 
-    # Hill Cipher Example
-    hill_key = np.array([[6, 24, 1], [13, 16, 10], [20, 17, 15]])  # Example 3x3 key matrix
-    hill_encrypted = hill_encrypt("HELLO WORLD", hill_key)
-    print("Hill Encrypted:", hill_encrypted)
+    text = input("\nEnter the text to encrypt: ").strip()
+    if not text:
+        print("Input text cannot be empty!")
+        exit()
 
-    # Transposition Cipher Example
-    single_encrypted = single_transposition_encrypt("HELLO WORLD", "SECRET")
-    double_encrypted = double_transposition_encrypt("HELLO WORLD", "SECRET", "KEY")
-    print("Single Transposition Encrypted:", single_encrypted)
-    print("Double Transposition Encrypted:", double_encrypted)
+    if choice == '1':
+        mono_key = "QWERTYUIOPASDFGHJKLZXCVBNM"
+        encrypted = monoalphabetic_encrypt(text, mono_key)
+        print(f"\nMonoalphabetic Encrypted Text: {encrypted}")
+
+    elif choice == '2':
+        key = input("Enter the Vigenère key: ").strip()
+        encrypted = vigenere_encrypt(text, key)
+        print(f"\nVigenère Encrypted Text: {encrypted}")
+
+    elif choice == '3':
+        key = input("Enter the Playfair key: ").strip()
+        encrypted = playfair_encrypt(text, key)
+        print(f"\nPlayfair Encrypted Text: {encrypted}")
+
+    elif choice == '4':
+        print("Enter a 3x3 Hill cipher key matrix (space-separated, 9 integers):")
+        key_input = input().strip()
+        try:
+            key_values = list(map(int, key_input.split()))
+            if len(key_values) != 9:
+                raise ValueError("Matrix must have exactly 9 integers.")
+            hill_key = np.array(key_values).reshape(3, 3)
+            encrypted = hill_encrypt(text, hill_key)
+            print(f"\nHill Cipher Encrypted Text: {encrypted}")
+        except Exception as e:
+            print(f"Error: {e}")
